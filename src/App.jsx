@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import * as DB from "./lib/supabase.js";
+import { signOut } from "./lib/supabase";
+
+signOut();
 
 // ─── constants ───────────────────────────────────────────────────────────────
 const MONTHS   = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
