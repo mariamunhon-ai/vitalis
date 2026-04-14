@@ -57,7 +57,7 @@ export async function getSession() {
 }
 
 export async function getProfile(userId) {
-  const { data, error } = await sb.from("profiles").select("*").eq("id", userId).single();
+  const { data, error } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (error) throw error;
   return data;
 }
