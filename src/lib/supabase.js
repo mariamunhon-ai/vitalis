@@ -19,12 +19,25 @@ export async function signUp({ email, password, name, role, nutriCode }) {
   // Resolve nutri_id from invite code (nutri's userId stored as code)
   let nutri_id = null;
   if (role === "aluno" && nutriCode) {
-    const { data: nutri } = await sb.from("profiles").select("id").eq("id", nutriCode).single();
-    if (nutri) nutri_id = nutri.id;
-  }
+  const { data: nutri } = await sb
+    .from("profiles")
+    .select("id")
+    .eq("invite_code", nutriCode)
+    .single();
 
-  const { error: pErr } = await sb.from("profiles").insert({ id: userId, email, name, role, nutri_id });
-  if (pErr) throw pErr;
+  if (nutri) nutri_id = nutri.id;
+}
+
+const { error: pErr } = await sb
+  .from("profiles")
+  .update({
+    name,
+    role,
+    nutri_id
+  })
+  .eq("id", userId);
+
+if (pErr) throw pErr;
   return data.user;
 }
 
