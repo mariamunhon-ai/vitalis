@@ -31,9 +31,9 @@ export async function signUp({ email, password, name, role, nutriCode }) {
 const { error: pErr } = await sb
   .from("profiles")
   .update({
-    name,
-    role,
-    nutri_id
+    name: name || "",
+    role: role || "aluno",
+    nutri_id: nutri_id || null
   })
   .eq("id", userId);
 
