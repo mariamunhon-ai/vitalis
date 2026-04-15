@@ -157,17 +157,61 @@ export default function AlunoApp({ profile, onSignOut, onProfileUpdate }) {
                 </div>
               </div>
             ); })}
-            <button onClick={()=>(mealModal.foods||[]).forEach(f=>{ if(!getFoodStatus(mealModal.id,f.id))toggleFood(mealModal.id,f.id,"skip"); })}
-              style={{width:"100%",background:`${C.red}12`,border:`1.5px dashed ${C.red}44`,borderRadius:14,padding:12,color:C.red,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginTop:4,marginBottom:20}}>
-              😓 Não consegui fazer esta refeição
-            </button>
-            <div style={{fontSize:12,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>📷 Foto do prato</div>
-            {todayLog[mealModal.id]?.photo?(
-              <div style={{position:"relative"}}>
-                <img src={todayLog[mealModal.id].photo} alt="" style={{width:"100%",borderRadius:16,maxHeight:220,objectFit:"cover"}}/>
-                <label style={{position:"absolute",bottom:10,right:10,background:"rgba(0,0,0,0.65)",borderRadius:10,padding:"6px 14px",cursor:"pointer",fontSize:12,fontWeight:700,color:"#fff",display:"inline-block"}}>
-                  Trocar<input type="file" accept="image/*" />
-      {measureModal&&(
+           <button
+  onClick={() => (mealModal.foods || []).forEach(f => {
+    if (!getFoodStatus(mealModal.id, f.id)) toggleFood(mealModal.id, f.id, "skip");
+  })}
+  style={{
+    width: "100%",
+    background: `${C.red}12`,
+    border: `1.5px dashed ${C.red}44`,
+    borderRadius: 14,
+    padding: 12,
+    color: C.red,
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    marginTop: 4,
+    marginBottom: 20
+  }}
+>
+  😓 Não consegui fazer esta refeição
+</button>
+
+<div style={{ fontSize: 12, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+  📷 Foto do prato
+</div>
+
+{todayLog[mealModal.id]?.photo ? (
+  <div style={{ position: "relative" }}>
+    <img
+      src={todayLog[mealModal.id].photo}
+      alt=""
+      style={{ width: "100%", borderRadius: 16, maxHeight: 220, objectFit: "cover" }}
+    />
+    <label
+      style={{
+        position: "absolute",
+        bottom: 10,
+        right: 10,
+        background: "rgba(0,0,0,0.65)",
+        borderRadius: 10,
+        padding: "6px 14px",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#fff",
+        display: "inline-block"
+      }}
+    >
+      Trocar
+      <input type="file" accept="image/*" style={{ display: "none" }} />
+    </label>
+  </div>
+) : null}
+
+{measureModal && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
           <div style={{background:C.card,borderRadius:"28px 28px 0 0",padding:"28px 24px 44px",width:"100%",maxWidth:480}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
