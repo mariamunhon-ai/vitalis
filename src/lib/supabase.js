@@ -12,32 +12,59 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
 export async function signUp({ email, password, name, role, nutriCode }) {
-  const { data, error } = await sb.auth.signUp({ email, password });
-  if (error) throw error;
-  const userId = data.user.id;
-
-  // Resolve nutri_id from invite code (nutri's userId stored as code)
   let nutri_id = null;
-  if (role === "aluno" && nutriCode) {
-  const { data: nutri } = await sb
+
+  // 🔴 REGRA: aluno PRECISA de código válido
+  if (role === "aluno") {
+    if (!nutriCode || !nutriCode.trim()) {
+      throw new Error("Informe o código da nutricionista.");
+    }
+
+    const { data: nutri, error: nutriError } = await sb
+      .from("profiles")
+      .select("id")
+      .eq("invite_code", nutriCode.trim())
+      .eq("role", "nutri")
+      .maybeSingle();
+
+    if (nutriError) throw nutriError;
+    if (!nutri) throw new Error("Código da nutricionista inválido.");
+
+    nutri_id = nutri.id;
+  }
+
+  // ✅ Cria usuário no Auth
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+
+  const userId = data?.user?.id;
+  if (!userId) throw new Error("Erro ao criar usuário.");
+
+  // 🧠 Monta profile
+  const profileData = {
+    id: userId,
+    email,
+    name,
+    role,
+    nutri_id,
+  };
+
+  // 🟢 Se for nutricionista, cria código automático
+  if (role === "nutri") {
+    profileData.invite_code = userId.slice(0, 8);
+  }
+
+  // ✅ Salva profile
+  const { error: profileError } = await sb
     .from("profiles")
-    .select("id")
-    .eq("invite_code", nutriCode)
-    .single();
+    .upsert(profileData);
 
-  if (nutri) nutri_id = nutri.id;
-}
+  if (profileError) throw profileError;
 
-const { error: pErr } = await sb
-  .from("profiles")
-  .update({
-    name: name || "",
-    role: role || "aluno",
-    nutri_id: nutri_id || null
-  })
-  .eq("id", userId);
-
-if (pErr) throw pErr;
   return data.user;
 }
 
