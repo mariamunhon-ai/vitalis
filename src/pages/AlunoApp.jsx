@@ -166,7 +166,7 @@ export default function AlunoApp({ profile, onSignOut, onProfileUpdate }) {
               <div style={{position:"relative"}}>
                 <img src={todayLog[mealModal.id].photo} alt="" style={{width:"100%",borderRadius:16,maxHeight:220,objectFit:"cover"}}/>
                 <label style={{position:"absolute",bottom:10,right:10,background:"rgba(0,0,0,0.65)",borderRadius:10,padding:"6px 14px",cursor:"pointer",fontSize:12,fontWeight:700,color:"#fff",display:"inline-block"}}>
-                  Trocar<input type="file" accept="image}
+                  Trocar<input type="file" accept="image/*" />
       {measureModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
           <div style={{background:C.card,borderRadius:"28px 28px 0 0",padding:"28px 24px 44px",width:"100%",maxWidth:480}}>
