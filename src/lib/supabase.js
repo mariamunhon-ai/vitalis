@@ -14,7 +14,7 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 export async function signUp({ email, password, name, role, nutriCode }) {
   let nutri_id = null;
 
-  // 🔴 REGRA: aluno PRECISA de código válido
+  // Se for aluno, código é obrigatório
   if (role === "aluno") {
     if (!nutriCode || !nutriCode.trim()) {
       throw new Error("Informe o código da nutricionista.");
@@ -33,7 +33,7 @@ export async function signUp({ email, password, name, role, nutriCode }) {
     nutri_id = nutri.id;
   }
 
-  // ✅ Cria usuário no Auth
+  // Cria no Auth
   const { data, error } = await sb.auth.signUp({
     email,
     password,
@@ -44,21 +44,19 @@ export async function signUp({ email, password, name, role, nutriCode }) {
   const userId = data?.user?.id;
   if (!userId) throw new Error("Erro ao criar usuário.");
 
-  // 🧠 Monta profile
   const profileData = {
     id: userId,
     email,
-    name,
     role,
     nutri_id,
+    name: name || null,
   };
 
-  // 🟢 Se for nutricionista, cria código automático
+  // Se for nutri, gera código de convite automático
   if (role === "nutri") {
-    profileData.invite_code = userId.slice(0, 8);
+    profileData.invite_code = userId.slice(0, 8).toUpperCase();
   }
 
-  // ✅ Salva profile
   const { error: profileError } = await sb
     .from("profiles")
     .upsert(profileData);
