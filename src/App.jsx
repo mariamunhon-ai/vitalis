@@ -91,43 +91,59 @@ export default function App() {
   }
 
   // ❌ erro
-  if (profileError) {
-    return (
-      <div style={styles.center}>
-        <h2>Erro</h2>
-        <p>{profileError}</p>
-        <button onClick={signOut}>Sair</button>
-      </div>
-    )
-  }
+if (profileError) {
+  return (
+    <div style={styles.center}>
+      <h2>Erro</h2>
+      <p>{profileError}</p>
+      <button onClick={signOut}>Sair</button>
+    </div>
+  )
+}
 
-  // 🧠 NUTRI
-  if (profile.role === "nutri") {
-    return (
-      <div style={styles.container}>
-        <h1>Área do Nutricionista</h1>
-        <p><b>Nome:</b> {profile.name}</p>
-        <p><b>Email:</b> {profile.email}</p>
-        <p><b>Role:</b> {profile.role}</p>
+// 🛑 PROTEÇÃO (COLOQUE AQUI)
+if (!profile) {
+  return (
+    <div style={styles.center}>
+      <h2>Carregando perfil...</h2>
+    </div>
+  )
+}
 
-        <button onClick={signOut}>Sair</button>
-      </div>
-    )
-  }
+// 🍓 NUTRI
+if (profile.role === "nutri") {
+  return (
+    <div style={styles.container}>
+      <h1>Área do Nutricionista</h1>
+      <p><b>Nome:</b> {profile.name}</p>
+      <p><b>Email:</b> {profile.email}</p>
+      <p><b>Role:</b> {profile.role}</p>
 
-  // 🧠 ALUNO
-  if (profile.role === "aluno") {
-    return (
-      <div style={styles.container}>
-        <h1>Área do Aluno</h1>
-        <p><b>Nome:</b> {profile.name}</p>
-        <p><b>Email:</b> {profile.email}</p>
+      <button onClick={signOut}>Sair</button>
+    </div>
+  )
+}
 
-        <button onClick={signOut}>Sair</button>
-      </div>
-    )
-  }
+// 🍇 ALUNO
+if (profile.role === "aluno") {
+  return (
+    <div style={styles.container}>
+      <h1>Área do Aluno</h1>
+      <p><b>Nome:</b> {profile.name}</p>
+      <p><b>Email:</b> {profile.email}</p>
 
+      <button onClick={signOut}>Sair</button>
+    </div>
+  )
+}
+
+// fallback
+return (
+  <div style={styles.center}>
+    <p>Perfil inválido</p>
+    <button onClick={signOut}>Sair</button>
+  </div>
+)
   return (
     <div style={styles.center}>
       <p>Perfil inválido</p>
