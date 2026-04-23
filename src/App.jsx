@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { sb } from "./lib/supabase"
-import * as DB from "./lib/db"
+import * as DB from "./lib/supabase"
 
 export default function App() {
   const [session, setSession] = useState(null)
