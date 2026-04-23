@@ -22,6 +22,8 @@ export async function signUp({ email, password, name, role, nutriCode }) {
   }
 
   let nutri_id = null
+  const cleanEmail = email.trim().toLowerCase()
+  const cleanName = name.trim()
 
   if (role === 'aluno') {
     if (!nutriCode?.trim()) {
@@ -35,7 +37,7 @@ export async function signUp({ email, password, name, role, nutriCode }) {
       .eq('role', 'nutri')
       .maybeSingle()
 
-    if (nutriError) throw nutriError
+    if (nutriError) throw new Error(nutriError.message)
     if (!nutri) {
       throw new Error('Código da nutricionista inválido. Verifique com ela e tente novamente.')
     }
@@ -43,12 +45,9 @@ export async function signUp({ email, password, name, role, nutriCode }) {
     nutri_id = nutri.id
   }
 
-  const cleanEmail = email.trim().toLowerCase()
-  const cleanName = name.trim()
-
   const { data, error } = await sb.auth.signUp({
     email: cleanEmail,
-    password
+    password,
   })
 
   if (error) throw new Error(translateAuthError(error.message))
@@ -58,13 +57,25 @@ export async function signUp({ email, password, name, role, nutriCode }) {
     throw new Error('Erro ao criar usuário. Tente novamente.')
   }
 
+  // Garante sessão autenticada para auth.uid() funcionar no insert do profile
+  const { error: loginAfterSignupError } = await sb.auth.signInWithPassword({
+    email: cleanEmail,
+    password,
+  })
+
+  if (loginAfterSignupError) {
+    throw new Error(
+      'Conta criada, mas não foi possível entrar automaticamente. Tente fazer login.'
+    )
+  }
+
   const profileData = {
     id: userId,
     email: cleanEmail,
     name: cleanName,
     role,
     nutri_id,
-    onboarding_done: false
+    onboarding_done: false,
   }
 
   if (role === 'nutri') {
@@ -76,7 +87,6 @@ export async function signUp({ email, password, name, role, nutriCode }) {
     .upsert(profileData, { onConflict: 'id' })
 
   if (profileError) {
-    await sb.auth.signOut()
     throw new Error(`Conta criada, mas houve erro ao salvar perfil: ${profileError.message}`)
   }
 
@@ -89,7 +99,7 @@ export async function signIn({ email, password }) {
 
   const { data, error } = await sb.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
-    password
+    password,
   })
 
   if (error) throw new Error(translateAuthError(error.message))
@@ -150,7 +160,7 @@ export async function completeOnboarding(userId, patch) {
     .update({
       ...patch,
       onboarding_done: true,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     })
     .eq('id', userId)
 
@@ -183,7 +193,7 @@ export async function saveWeekDiet(alunoId, weekDietObj) {
     {
       aluno_id: alunoId,
       data: weekDietObj,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     },
     { onConflict: 'aluno_id' }
   )
@@ -214,7 +224,7 @@ export async function saveMeds(alunoId, medsArray) {
     aluno_id: alunoId,
     name: m.name,
     dose: m.dose,
-    times: m.times || []
+    times: m.times || [],
   }))
 
   const { error } = await sb.from('medications').insert(rows)
@@ -240,7 +250,7 @@ export async function saveDayLog(alunoId, dateStr, logData) {
     {
       aluno_id: alunoId,
       log_date: dateStr,
-      data: logData
+      data: logData,
     },
     { onConflict: 'aluno_id,log_date' }
   )
@@ -280,7 +290,7 @@ export async function getDiary(alunoId) {
   ;(data || []).forEach(r => {
     map[r.entry_date] = {
       entries: r.entries || [],
-      progressPhoto: r.progress_photo
+      progressPhoto: r.progress_photo,
     }
   })
   return map
@@ -292,7 +302,7 @@ export async function saveDiaryDay(alunoId, dateStr, entries, progressPhoto) {
       aluno_id: alunoId,
       entry_date: dateStr,
       entries,
-      progress_photo: progressPhoto || null
+      progress_photo: progressPhoto || null,
     },
     { onConflict: 'aluno_id,entry_date' }
   )
@@ -336,14 +346,12 @@ export async function getNutriNotes(nutriId, alunoId) {
 }
 
 export async function addNutriNote(nutriId, alunoId, text, noteDate) {
-  const { error } = await sb
-    .from('nutri_notes')
-    .insert({
-      nutri_id: nutriId,
-      aluno_id: alunoId,
-      text,
-      note_date: noteDate
-    })
+  const { error } = await sb.from('nutri_notes').insert({
+    nutri_id: nutriId,
+    aluno_id: alunoId,
+    text,
+    note_date: noteDate,
+  })
 
   if (error) throw error
 }
@@ -373,7 +381,7 @@ export async function getAdminNutris() {
 
   return (data || []).map(n => ({
     ...n,
-    alunos: countMap[n.id] || 0
+    alunos: countMap[n.id] || 0,
   }))
 }
 
@@ -386,7 +394,7 @@ export async function adminUpdateNutriPlan(nutriId, plan, paidUntil, startDate, 
       start_date: startDate,
       plan_valor: valor,
       status: 'ativo',
-      blocked: false
+      blocked: false,
     })
     .eq('id', nutriId)
 
@@ -398,7 +406,7 @@ export async function adminToggleBlock(nutriId, block) {
     .from('profiles')
     .update({
       blocked: block,
-      status: block ? 'bloqueado' : 'ativo'
+      status: block ? 'bloqueado' : 'ativo',
     })
     .eq('id', nutriId)
 
