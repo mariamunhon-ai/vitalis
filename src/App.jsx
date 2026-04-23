@@ -28,14 +28,8 @@ export default function App() {
       }
     })
 
-    const { data: { subscription } } = DB.sb.auth.onAuthStateChange(async (event, sess) => {
+    const { data: { subscription } } = DB.sb.auth.onAuthStateChange(async (_event, sess) => {
       setSession(sess)
-
-      if (event === "SIGNED_OUT" || (!sess && event === "TOKEN_REFRESHED")) {
-        setProfile(null)
-        return
-      }
-
       if (sess?.user) {
         try {
           const p = await DB.getProfile(sess.user.id)
@@ -63,7 +57,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <AuthScreen onAuth={setProfile} />
+    return <AuthScreen />
   }
 
   if (!profile) {
@@ -88,16 +82,12 @@ export default function App() {
   }
 
   if (profile.role === "nutri") {
-    if (!profile.onboarding_done) {
-      return <NutriOnboarding profile={profile} onDone={setProfile} />
-    }
+    if (!profile.onboarding_done) return <NutriOnboarding profile={profile} onDone={setProfile} />
     return <NutriDashboard profile={profile} onSignOut={signOut} />
   }
 
   if (profile.role === "aluno") {
-    if (!profile.onboarding_done) {
-      return <AlunoOnboarding profile={profile} onDone={setProfile} />
-    }
+    if (!profile.onboarding_done) return <AlunoOnboarding profile={profile} onDone={setProfile} />
     return <AlunoApp profile={profile} onSignOut={signOut} onProfileUpdate={setProfile} />
   }
 
@@ -106,7 +96,7 @@ export default function App() {
       <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
       <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Perfil com role inválido</div>
       <div style={{ fontSize: 14, color: C.muted, marginBottom: 24 }}>
-        Role "{profile.role}" não reconhecido. Contate o suporte.
+        Role "{profile.role}" não reconhecido.
       </div>
       <button
         onClick={signOut}
