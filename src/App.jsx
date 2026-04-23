@@ -28,7 +28,6 @@ export default function App() {
       }
 
       try {
-        setProfile(undefined)
         setProfileError("")
 
         const p = await DB.getProfile(sess.user.id)
