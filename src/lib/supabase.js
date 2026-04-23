@@ -9,7 +9,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON) {
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON)
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
+// AUTH
 
 export async function signUp({ email, password, name, role, nutriCode }) {
   if (!email?.trim()) throw new Error('Digite seu e-mail.')
@@ -21,9 +21,10 @@ export async function signUp({ email, password, name, role, nutriCode }) {
     throw new Error('Perfil inválido.')
   }
 
-  let nutri_id = null
   const cleanEmail = email.trim().toLowerCase()
   const cleanName = name.trim()
+
+  let nutri_id = null
 
   if (role === 'aluno') {
     if (!nutriCode?.trim()) {
@@ -38,9 +39,7 @@ export async function signUp({ email, password, name, role, nutriCode }) {
       .maybeSingle()
 
     if (nutriError) throw new Error(nutriError.message)
-    if (!nutri) {
-      throw new Error('Código da nutricionista inválido. Verifique com ela e tente novamente.')
-    }
+    if (!nutri) throw new Error('Código da nutricionista inválido.')
 
     nutri_id = nutri.id
   }
@@ -48,46 +47,48 @@ export async function signUp({ email, password, name, role, nutriCode }) {
   const { data, error } = await sb.auth.signUp({
     email: cleanEmail,
     password,
+    options: {
+      data: {
+        name: cleanName,
+        role
+      }
+    }
   })
 
   if (error) throw new Error(translateAuthError(error.message))
 
-  const userId = data?.user?.id
-  if (!userId) {
-    throw new Error('Erro ao criar usuário. Tente novamente.')
-  }
-
-  // Garante sessão autenticada para auth.uid() funcionar no insert do profile
-  const { error: loginAfterSignupError } = await sb.auth.signInWithPassword({
+  // garante sessão
+  const { error: loginError } = await sb.auth.signInWithPassword({
     email: cleanEmail,
-    password,
+    password
   })
 
-  if (loginAfterSignupError) {
-    throw new Error(
-      'Conta criada, mas não foi possível entrar automaticamente. Tente fazer login.'
-    )
+  if (loginError) {
+    throw new Error('Conta criada, mas não foi possível entrar automaticamente.')
   }
 
-  const profileData = {
+  const userId = data?.user?.id
+  if (!userId) throw new Error('Erro ao criar usuário.')
+
+  const profilePatch = {
     id: userId,
     email: cleanEmail,
     name: cleanName,
     role,
     nutri_id,
-    onboarding_done: false,
+    onboarding_done: false
   }
 
   if (role === 'nutri') {
-    profileData.invite_code = userId.slice(0, 8).toUpperCase()
+    profilePatch.invite_code = userId.slice(0, 8).toUpperCase()
   }
 
   const { error: profileError } = await sb
     .from('profiles')
-    .upsert(profileData, { onConflict: 'id' })
+    .upsert(profilePatch, { onConflict: 'id' })
 
   if (profileError) {
-    throw new Error(`Conta criada, mas houve erro ao salvar perfil: ${profileError.message}`)
+    throw new Error(`Erro ao salvar perfil: ${profileError.message}`)
   }
 
   return data.user
@@ -99,7 +100,7 @@ export async function signIn({ email, password }) {
 
   const { data, error } = await sb.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
-    password,
+    password
   })
 
   if (error) throw new Error(translateAuthError(error.message))
@@ -108,20 +109,12 @@ export async function signIn({ email, password }) {
 
   if (!profile) {
     await sb.auth.signOut()
-    throw new Error('Perfil não encontrado. Tente entrar novamente ou refaça o cadastro.')
+    throw new Error('Perfil não encontrado. Refaça o cadastro.')
   }
 
-  if (profile?.blocked) {
+  if (profile.blocked) {
     await sb.auth.signOut()
-    throw new Error('Sua conta está temporariamente bloqueada. Entre em contato com o suporte.')
-  }
-
-  if (profile?.role === 'nutri' && profile?.paid_until) {
-    const expired = new Date(profile.paid_until) < new Date()
-    if (expired && profile?.status === 'bloqueado') {
-      await sb.auth.signOut()
-      throw new Error('Seu plano venceu. Entre em contato para renovar.')
-    }
+    throw new Error('Sua conta está bloqueada.')
   }
 
   return data.user
@@ -160,22 +153,26 @@ export async function completeOnboarding(userId, patch) {
     .update({
       ...patch,
       onboarding_done: true,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     })
     .eq('id', userId)
 
   if (error) throw error
 }
 
-// ─── NUTRI — aluno list ──────────────────────────────────────────────────────
+// NUTRI
 
 export async function getMyAlunos() {
-  const { data, error } = await sb.rpc('get_my_alunos')
+  const { data, error } = await sb
+    .from('profiles')
+    .select('*')
+    .eq('role', 'aluno')
+
   if (error) throw error
   return data || []
 }
 
-// ─── WEEK DIET ────────────────────────────────────────────────────────────────
+// WEEK DIET
 
 export async function getWeekDiet(alunoId) {
   const { data, error } = await sb
@@ -193,7 +190,7 @@ export async function saveWeekDiet(alunoId, weekDietObj) {
     {
       aluno_id: alunoId,
       data: weekDietObj,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     },
     { onConflict: 'aluno_id' }
   )
@@ -201,7 +198,7 @@ export async function saveWeekDiet(alunoId, weekDietObj) {
   if (error) throw error
 }
 
-// ─── MEDICATIONS ──────────────────────────────────────────────────────────────
+// MEDICATIONS
 
 export async function getMeds(alunoId) {
   const { data, error } = await sb
@@ -224,14 +221,14 @@ export async function saveMeds(alunoId, medsArray) {
     aluno_id: alunoId,
     name: m.name,
     dose: m.dose,
-    times: m.times || [],
+    times: m.times || []
   }))
 
   const { error } = await sb.from('medications').insert(rows)
   if (error) throw error
 }
 
-// ─── DAILY LOGS ───────────────────────────────────────────────────────────────
+// DAILY LOGS
 
 export async function getDayLog(alunoId, dateStr) {
   const { data, error } = await sb
@@ -250,7 +247,7 @@ export async function saveDayLog(alunoId, dateStr, logData) {
     {
       aluno_id: alunoId,
       log_date: dateStr,
-      data: logData,
+      data: logData
     },
     { onConflict: 'aluno_id,log_date' }
   )
@@ -258,24 +255,7 @@ export async function saveDayLog(alunoId, dateStr, logData) {
   if (error) throw error
 }
 
-export async function getLogsRange(alunoId, fromDate, toDate) {
-  const { data, error } = await sb
-    .from('daily_logs')
-    .select('log_date,data')
-    .eq('aluno_id', alunoId)
-    .gte('log_date', fromDate)
-    .lte('log_date', toDate)
-
-  if (error) throw error
-
-  const map = {}
-  ;(data || []).forEach(r => {
-    map[r.log_date] = r.data
-  })
-  return map
-}
-
-// ─── DIARY ────────────────────────────────────────────────────────────────────
+// DIARY
 
 export async function getDiary(alunoId) {
   const { data, error } = await sb
@@ -290,7 +270,7 @@ export async function getDiary(alunoId) {
   ;(data || []).forEach(r => {
     map[r.entry_date] = {
       entries: r.entries || [],
-      progressPhoto: r.progress_photo,
+      progressPhoto: r.progress_photo
     }
   })
   return map
@@ -302,7 +282,7 @@ export async function saveDiaryDay(alunoId, dateStr, entries, progressPhoto) {
       aluno_id: alunoId,
       entry_date: dateStr,
       entries,
-      progress_photo: progressPhoto || null,
+      progress_photo: progressPhoto || null
     },
     { onConflict: 'aluno_id,entry_date' }
   )
@@ -310,7 +290,7 @@ export async function saveDiaryDay(alunoId, dateStr, entries, progressPhoto) {
   if (error) throw error
 }
 
-// ─── MEASUREMENTS ─────────────────────────────────────────────────────────────
+// MEASUREMENTS
 
 export async function getMeasurements(alunoId) {
   const { data, error } = await sb
@@ -331,7 +311,7 @@ export async function addMeasurement(alunoId, m) {
   if (error) throw error
 }
 
-// ─── NUTRI NOTES ──────────────────────────────────────────────────────────────
+// NUTRI NOTES
 
 export async function getNutriNotes(nutriId, alunoId) {
   const { data, error } = await sb
@@ -350,13 +330,13 @@ export async function addNutriNote(nutriId, alunoId, text, noteDate) {
     nutri_id: nutriId,
     aluno_id: alunoId,
     text,
-    note_date: noteDate,
+    note_date: noteDate
   })
 
   if (error) throw error
 }
 
-// ─── ADMIN ────────────────────────────────────────────────────────────────────
+// ADMIN
 
 export async function getAdminNutris() {
   const { data, error } = await sb
@@ -381,7 +361,7 @@ export async function getAdminNutris() {
 
   return (data || []).map(n => ({
     ...n,
-    alunos: countMap[n.id] || 0,
+    alunos: countMap[n.id] || 0
   }))
 }
 
@@ -394,7 +374,7 @@ export async function adminUpdateNutriPlan(nutriId, plan, paidUntil, startDate, 
       start_date: startDate,
       plan_valor: valor,
       status: 'ativo',
-      blocked: false,
+      blocked: false
     })
     .eq('id', nutriId)
 
@@ -406,37 +386,12 @@ export async function adminToggleBlock(nutriId, block) {
     .from('profiles')
     .update({
       blocked: block,
-      status: block ? 'bloqueado' : 'ativo',
+      status: block ? 'bloqueado' : 'ativo'
     })
     .eq('id', nutriId)
 
   if (error) throw error
 }
-
-// ─── REALTIME ─────────────────────────────────────────────────────────────────
-
-export function subscribeToAluno(alunoId, onChange) {
-  return sb
-    .channel(`aluno_${alunoId}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'daily_logs', filter: `aluno_id=eq.${alunoId}` },
-      onChange
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'diary', filter: `aluno_id=eq.${alunoId}` },
-      onChange
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'measurements', filter: `aluno_id=eq.${alunoId}` },
-      onChange
-    )
-    .subscribe()
-}
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function translateAuthError(msg) {
   if (!msg) return 'Erro desconhecido.'
