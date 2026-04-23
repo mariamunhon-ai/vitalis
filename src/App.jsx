@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { sb } from "./lib/supabaseClient"
+import { sb } from "./lib/supabase"
 import * as DB from "./lib/db"
 
 export default function App() {
