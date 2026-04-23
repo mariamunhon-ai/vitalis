@@ -1,245 +1,156 @@
 import { useEffect, useState } from "react"
-import * as DB from "./lib/supabase.js"
-import { C } from "./constants.js"
-import { Spinner } from "./ui.jsx"
-
-import AuthScreen from "./pages/AuthScreen.jsx"
-import AdminDashboard from "./pages/AdminDashboard.jsx"
-import NutriOnboarding from "./pages/NutriOnboarding.jsx"
-import NutriDashboard from "./pages/NutriDashboard.jsx"
-import AlunoOnboarding from "./pages/AlunoOnboarding.jsx"
-import AlunoApp from "./pages/AlunoApp.jsx"
+import { sb } from "./lib/supabaseClient"
+import * as DB from "./lib/db"
 
 export default function App() {
-  const [session, setSession] = useState(undefined)
+  const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(undefined)
   const [profileError, setProfileError] = useState("")
+  const [loading, setLoading] = useState(true)
 
+  // 🔥 pega sessão inicial
   useEffect(() => {
-    let mounted = true
+    sb.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoading(false)
+    })
 
-    async function loadProfileFromSession(sess) {
-      if (!mounted) return
-
-      if (!sess?.user) {
-        setProfile(null)
-        setProfileError("")
-        return
-      }
-
-      try {
-        setProfileError("")
-
-        const p = await DB.getProfile(sess.user.id)
-
-        if (!mounted) return
-
-        if (!p) {
-          setProfile(null)
-          setProfileError("Perfil não encontrado na tabela profiles.")
-          return
-        }
-
-        setProfile(p)
-        DB.touchLastSeen(sess.user.id)
-      } catch (err) {
-        if (!mounted) return
-        console.error("Erro ao carregar perfil:", err)
-        setProfile(null)
-        setProfileError(err?.message || "Erro ao carregar perfil.")
-      }
-    }
-
-    DB.getSession()
-      .then(sess => {
-        if (!mounted) return
-        setSession(sess)
-        loadProfileFromSession(sess)
-      })
-      .catch(err => {
-        console.error("Erro ao buscar sessão:", err)
-        if (!mounted) return
-        setSession(null)
-        setProfile(null)
-        setProfileError("Erro ao buscar sessão.")
-      })
-
-    const {
-      data: { subscription }
-    } = DB.sb.auth.onAuthStateChange(async (_event, sess) => {
-      if (!mounted) return
+    const { data: listener } = sb.auth.onAuthStateChange((_event, sess) => {
       setSession(sess)
-      await loadProfileFromSession(sess)
     })
 
     return () => {
-      mounted = false
-      subscription.unsubscribe()
+      listener.subscription.unsubscribe()
     }
   }, [])
 
-  const signOut = async () => {
-    await DB.signOut()
-    setSession(null)
-    setProfile(null)
-    setProfileError("")
+  // 🔥 carrega perfil UMA VEZ por sessão
+  useEffect(() => {
+    if (!session?.user) {
+      setProfile(null)
+      return
+    }
+
+    loadProfile(session.user.id)
+
+  }, [session])
+
+  // 🔥 função limpa (sem loop)
+  async function loadProfile(userId) {
+    try {
+      setProfileError("")
+
+      const p = await DB.getProfile(userId)
+
+      if (!p) {
+        setProfile(null)
+        setProfileError("Perfil não encontrado na tabela profiles.")
+        return
+      }
+
+      setProfile(p)
+      DB.touchLastSeen(userId)
+
+    } catch (err) {
+      console.error("Erro ao carregar perfil:", err)
+      setProfile(null)
+      setProfileError(err?.message || "Erro ao carregar perfil.")
+    }
   }
 
-  if (session === undefined) {
+  async function signOut() {
+    await sb.auth.signOut()
+    setProfile(null)
+  }
+
+  // 🔄 loading inicial
+  if (loading) {
     return (
-      <div
-        style={{
-          fontFamily: "'Outfit',sans-serif",
-          background: C.bg,
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          color: C.text
-        }}
-      >
-        <link
-          href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Lora:wght@700&display=swap"
-          rel="stylesheet"
-        />
-        <div style={{ fontSize: 64, marginBottom: 16 }}>🥗</div>
-        <Spinner text="Iniciando Vitalis…" />
+      <div style={styles.center}>
+        <p>Carregando...</p>
       </div>
     )
   }
 
+  // 🔐 não logado
   if (!session) {
-    return <AuthScreen />
+    return (
+      <div style={styles.center}>
+        <h2>Você não está logado</h2>
+      </div>
+    )
   }
 
+  // 🔄 carregando perfil
   if (profile === undefined) {
     return (
-      <div
-        style={{
-          fontFamily: "'Outfit',sans-serif",
-          background: C.bg,
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 40,
-          color: C.text
-        }}
-      >
-        <link
-          href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Lora:wght@700&display=swap"
-          rel="stylesheet"
-        />
-        <Spinner text="Carregando perfil…" />
+      <div style={styles.center}>
+        <p>Carregando perfil...</p>
       </div>
     )
   }
 
-  if (profile === null) {
+  // ❌ erro
+  if (profileError) {
     return (
-      <div
-        style={{
-          fontFamily: "'Outfit',sans-serif",
-          background: C.bg,
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 40,
-          color: C.text,
-          textAlign: "center"
-        }}
-      >
-        <link
-          href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Lora:wght@700&display=swap"
-          rel="stylesheet"
-        />
-        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-          Não foi possível carregar o perfil
-        </div>
-        <div style={{ fontSize: 14, color: C.muted, marginBottom: 24 }}>
-          {profileError || "O usuário está autenticado, mas o perfil não foi carregado."}
-        </div>
-        <button
-          onClick={signOut}
-          style={{
-            marginTop: 8,
-            background: "transparent",
-            border: `1px solid ${C.border}`,
-            borderRadius: 12,
-            padding: "8px 20px",
-            color: C.muted,
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: "inherit"
-          }}
-        >
-          Sair e tentar novamente
-        </button>
+      <div style={styles.center}>
+        <h2>Erro</h2>
+        <p>{profileError}</p>
+        <button onClick={signOut}>Sair</button>
       </div>
     )
   }
 
-  if (profile.role === "admin") {
-    return <AdminDashboard profile={profile} onSignOut={signOut} />
-  }
-
+  // 🧠 NUTRI
   if (profile.role === "nutri") {
-    if (!profile.onboarding_done) {
-      return <NutriOnboarding profile={profile} onDone={setProfile} />
-    }
-    return <NutriDashboard profile={profile} onSignOut={signOut} />
+    return (
+      <div style={styles.container}>
+        <h1>Área do Nutricionista</h1>
+        <p><b>Nome:</b> {profile.name}</p>
+        <p><b>Email:</b> {profile.email}</p>
+        <p><b>Role:</b> {profile.role}</p>
+
+        <button onClick={signOut}>Sair</button>
+      </div>
+    )
   }
 
+  // 🧠 ALUNO
   if (profile.role === "aluno") {
-    if (!profile.onboarding_done) {
-      return <AlunoOnboarding profile={profile} onDone={setProfile} />
-    }
-    return <AlunoApp profile={profile} onSignOut={signOut} onProfileUpdate={setProfile} />
+    return (
+      <div style={styles.container}>
+        <h1>Área do Aluno</h1>
+        <p><b>Nome:</b> {profile.name}</p>
+        <p><b>Email:</b> {profile.email}</p>
+
+        <button onClick={signOut}>Sair</button>
+      </div>
+    )
   }
 
   return (
-    <div
-      style={{
-        fontFamily: "'Outfit',sans-serif",
-        background: C.bg,
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 40,
-        color: C.text,
-        textAlign: "center"
-      }}
-    >
-      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-      <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-        Perfil com role inválido
-      </div>
-      <div style={{ fontSize: 14, color: C.muted, marginBottom: 24 }}>
-        Role "{profile.role}" não reconhecido.
-      </div>
-      <button
-        onClick={signOut}
-        style={{
-          background: C.red,
-          border: "none",
-          borderRadius: 12,
-          padding: "10px 24px",
-          color: "#fff",
-          fontWeight: 700,
-          fontSize: 14,
-          cursor: "pointer",
-          fontFamily: "inherit"
-        }}
-      >
-        Sair
-      </button>
+    <div style={styles.center}>
+      <p>Perfil inválido</p>
+      <button onClick={signOut}>Sair</button>
     </div>
   )
+}
+
+// 🎨 estilos simples
+const styles = {
+  center: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "column",
+    background: "#0b0f18",
+    color: "#fff"
+  },
+  container: {
+    minHeight: "100vh",
+    padding: 40,
+    background: "#0b0f18",
+    color: "#fff"
+  }
 }
