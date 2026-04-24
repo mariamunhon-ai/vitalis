@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react"
 import { sb } from "./lib/supabase"
 import * as DB from "./lib/supabase"
+import AuthScreen from "./pages/AuthScreen"
 
 export default function App() {
-  const [session, setSession] = useState(null)
+  const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(undefined)
   const [profileError, setProfileError] = useState("")
   const [loading, setLoading] = useState(true)
 
-  // 🔥 pega sessão inicial
   useEffect(() => {
-    sb.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+    async function init() {
+      const { data } = await sb.auth.getSession()
+      setSession(data.session || null)
       setLoading(false)
-    })
+    }
+
+    init()
 
     const { data: listener } = sb.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess)
+      setSession(sess || null)
     })
 
     return () => {
@@ -24,20 +27,19 @@ export default function App() {
     }
   }, [])
 
-  // 🔥 carrega perfil UMA VEZ por sessão
   useEffect(() => {
     if (!session?.user) {
       setProfile(null)
+      setProfileError("")
       return
     }
 
     loadProfile(session.user.id)
-
   }, [session])
 
-  // 🔥 função limpa (sem loop)
   async function loadProfile(userId) {
     try {
+      setProfile(undefined)
       setProfileError("")
 
       const p = await DB.getProfile(userId)
@@ -50,7 +52,6 @@ export default function App() {
 
       setProfile(p)
       DB.touchLastSeen(userId)
-
     } catch (err) {
       console.error("Erro ao carregar perfil:", err)
       setProfile(null)
@@ -60,11 +61,11 @@ export default function App() {
 
   async function signOut() {
     await sb.auth.signOut()
+    setSession(null)
     setProfile(null)
   }
 
-  // 🔄 loading inicial
-  if (loading) {
+  if (loading || session === undefined) {
     return (
       <div style={styles.center}>
         <p>Carregando...</p>
@@ -72,16 +73,10 @@ export default function App() {
     )
   }
 
-  // 🔐 não logado
   if (!session) {
-    return (
-      <div style={styles.center}>
-        <h2>Você não está logado</h2>
-      </div>
-    )
+    return <AuthScreen />
   }
 
-  // 🔄 carregando perfil
   if (profile === undefined) {
     return (
       <div style={styles.center}>
@@ -90,69 +85,57 @@ export default function App() {
     )
   }
 
-  // ❌ erro
-if (profileError) {
+  if (profileError) {
+    return (
+      <div style={styles.center}>
+        <h2>Erro</h2>
+        <p>{profileError}</p>
+        <button onClick={signOut}>Sair</button>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div style={styles.center}>
+        <h2>Perfil não carregado</h2>
+        <button onClick={signOut}>Sair</button>
+      </div>
+    )
+  }
+
+  if (profile.role === "nutri") {
+    return (
+      <div style={styles.container}>
+        <h1>Área do Nutricionista</h1>
+        <p><b>Nome:</b> {profile.name}</p>
+        <p><b>Email:</b> {profile.email}</p>
+        <p><b>Role:</b> {profile.role}</p>
+        <button onClick={signOut}>Sair</button>
+      </div>
+    )
+  }
+
+  if (profile.role === "aluno") {
+    return (
+      <div style={styles.container}>
+        <h1>Área do Aluno</h1>
+        <p><b>Nome:</b> {profile.name}</p>
+        <p><b>Email:</b> {profile.email}</p>
+        <p><b>Role:</b> {profile.role}</p>
+        <button onClick={signOut}>Sair</button>
+      </div>
+    )
+  }
+
   return (
     <div style={styles.center}>
-      <h2>Erro</h2>
-      <p>{profileError}</p>
+      <p>Perfil inválido: {profile.role}</p>
       <button onClick={signOut}>Sair</button>
     </div>
   )
 }
 
-// 🛑 PROTEÇÃO (COLOQUE AQUI)
-if (!profile) {
-  return (
-    <div style={styles.center}>
-      <h2>Carregando perfil...</h2>
-    </div>
-  )
-}
-
-// 🍓 NUTRI
-if (profile.role === "nutri") {
-  return (
-    <div style={styles.container}>
-      <h1>Área do Nutricionista</h1>
-      <p><b>Nome:</b> {profile.name}</p>
-      <p><b>Email:</b> {profile.email}</p>
-      <p><b>Role:</b> {profile.role}</p>
-
-      <button onClick={signOut}>Sair</button>
-    </div>
-  )
-}
-
-// 🍇 ALUNO
-if (profile.role === "aluno") {
-  return (
-    <div style={styles.container}>
-      <h1>Área do Aluno</h1>
-      <p><b>Nome:</b> {profile.name}</p>
-      <p><b>Email:</b> {profile.email}</p>
-
-      <button onClick={signOut}>Sair</button>
-    </div>
-  )
-}
-
-// fallback
-return (
-  <div style={styles.center}>
-    <p>Perfil inválido</p>
-    <button onClick={signOut}>Sair</button>
-  </div>
-)
-  return (
-    <div style={styles.center}>
-      <p>Perfil inválido</p>
-      <button onClick={signOut}>Sair</button>
-    </div>
-  )
-}
-
-// 🎨 estilos simples
 const styles = {
   center: {
     minHeight: "100vh",
@@ -161,12 +144,14 @@ const styles = {
     alignItems: "center",
     flexDirection: "column",
     background: "#0b0f18",
-    color: "#fff"
+    color: "#fff",
+    fontFamily: "Arial, sans-serif"
   },
   container: {
     minHeight: "100vh",
     padding: 40,
     background: "#0b0f18",
-    color: "#fff"
+    color: "#fff",
+    fontFamily: "Arial, sans-serif"
   }
 }
