@@ -63,7 +63,6 @@ export async function signUp({ email, password, role, nutriCode }) {
   const { error: profileError } = await sb.from('profiles').upsert(profileData)
   if (profileError) {
     // Rollback: delete the auth user so there's no half-created state
-    try { await sb.auth.admin.deleteUser(userId) } catch {}
     await sb.auth.signOut()
     throw new Error('Erro ao criar seu perfil. Tente novamente. Se o problema persistir, contate o suporte.')
   }
@@ -115,21 +114,16 @@ export async function getProfile(userId, retries = 2) {
         .select('*')
         .eq('id', userId)
         .maybeSingle()
+
       if (error) throw error
-      return data // null if not found — caller handles
+      return data
     } catch (e) {
       if (attempt === retries) throw e
       await new Promise(r => setTimeout(r, 400 * (attempt + 1)))
     }
   }
-} = await sb
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle()
 
-  if (error) throw error
-  return data // null if not found — caller handles this
+  return null
 }
 
 export async function touchLastSeen(userId) {
